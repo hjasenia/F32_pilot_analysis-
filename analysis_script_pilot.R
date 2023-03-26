@@ -27,7 +27,7 @@ ACLEW_all_anno_updated <- read.csv("ACLEW_all_annotations_updated.csv")
 #load addressee key 
 ACLEW_addresee_key <- read.csv("addressee_key.csv")
 
-#tallies the no. of utterances directed across group   
+#analyzes mean utterance at a group level  
 ACLEW_amount_xds_group <- ACLEW_all_anno_updated %>%                        
   filter(!participant == "CHI" & !recording_id == "3749_scrubbed.eaf" & !xds %in% c('X','M')) %>%    #exclude speech from target child and 3749_scrubbed
   group_by(recording_id) %>%
@@ -43,8 +43,7 @@ ACLEW_amount_xds_group <- ACLEW_all_anno_updated %>%
 ACLEW_amount_xds_group <- left_join(ACLEW_amount_xds_group, ACLEW_addresee_key)                  #adds key to summary table 
 
 
-
-#tallies the no. of utterances directed to each addressee per infant
+#analyzes mean utterance at an individual level 
 ACLEW_amount_xds_individual <- ACLEW_all_anno_updated %>%
   filter(!participant == "CHI" & !recording_id == "3749_scrubbed.eaf" & !xds %in% c('X','M')) %>%    #exclude speech from target child and 3749_scrubbed
   group_by(recording_id) %>%
@@ -53,34 +52,45 @@ ACLEW_amount_xds_individual <- ACLEW_all_anno_updated %>%
  ACLEW_amount_xds_individual <- left_join(ACLEW_amount_xds_individual, ACLEW_addresee_key)     #adds key to summary table
 
 
-#calculate frequency of each type of content word 
+#analyses for linguistic measures: MLU, TTR, prop of utterance types (lines 57 - )
+#download the required library 
 library(stringr)
 
-ACLEW_all_annotations_clean <- ACLEW_all_annotations %>% #removes unintelligible utterances 
-  filter(!str_detect(annotation, "xxx"), participant != "CHI", !str_detect(annotation, pattern = "(.@l|.@s|.@c)")) %>%  #removes utterances that contain codeswitching, child-talk, or spellings 
-  mutate(annotation = str_remove_all(annotation, pattern = "(\\[)[=](.*)?[(\\])]"))%>%                                 #removes non-linguistic communicative noise during talks (so, ones in brackets)
-  mutate(annotation = str_remove_all(annotation, pattern = "(&)([^ ]+)"))   %>%                                        #removes non-linguistic communicative noise not of brackets  (so, ones that start with & symbol)
-  mutate(annotation = str_remove_all(annotation, pattern = "<(.*?)>")) %>%                                             #removes misspellings 
-  mutate(annotation = str_remove_all(annotation, pattern = "(\\[:)|(])"))%>%                                           #remove correct spellings from square brackets 
-  mutate(annotation = str_remove_all(annotation, pattern = "(<)|(>)|(\\.)|(,)|(!)|(\\?)")) %>%                         #removes punctuation
-  mutate(annotation = str_remove_all(annotation, pattern = "(^-)|(-$)|(--)|(-\\s)"))    %>%                            #removes hyphens (indicate interrupted speech)
-  filter(!str_detect(annotation, pattern = "(\\[)(spa adios)|(\\[)(fra au revoir)"))      #remove line in spanish or french 
+#cleaning dataframe  
+#cleans ACLEW_all_anno_updated df by removing strings that follow a specified pattern 
+#filter fxn removes entire utterance 
+#str_remove_all only removes segments of string that matches the indicated pattern
 
-ACLEW_all_annotations_clean$annotation <- str_squish(ACLEW_all_annotations_clean$annotation)  #remove excess white space in beginning, middle, and end of string
-ACLEW_all_annotations_clean <- ACLEW_all_annotations_clean[!ACLEW_all_annotations_clean$annotation == "",]        #remove empty rows (these are extra spaces created when utterance were removed) 
+ACLEW_all_anno_clean <- ACLEW_all_anno_updated %>%  
+  filter(!str_detect(annotation, "xxx"), participant != "CHI", !str_detect(annotation, pattern = "(.@l|.@s|.@c)")) %>%   #removes utterances that contain codeswitching, child-talk, or spellings 
+  mutate(annotation = str_remove_all(annotation, pattern = "(\\[)[=](.*)?[(\\])]"))%>%                                   #removes non-linguistic communicative noise during talks (so, ones in brackets)
+  mutate(annotation = str_remove_all(annotation, pattern = "(&)([^ ]+)"))   %>%                                          #removes non-linguistic communicative noise not of brackets  (so, ones that start with & symbol)
+  mutate(annotation = str_remove_all(annotation, pattern = "<(.*?)>")) %>%                                               #removes misspellings 
+  mutate(annotation = str_remove_all(annotation, pattern = "(\\[:)|(])"))%>%                                             #remove correct spellings from square brackets 
+  mutate(annotation = str_remove_all(annotation, pattern = "(<)|(>)|(\\.)|(,)|(!)|(\\?)")) %>%                           #removes punctuation
+  mutate(annotation = str_remove_all(annotation, pattern = "(^-)|(-$)|(--)|(-\\s)"))    %>%                              #removes hyphens (indicate interrupted speech)
+  filter(!str_detect(annotation, pattern = "(\\[)(spa adios)|(\\[)(fra au revoir)"))    %>%                              #remove specific lines in spanish or french that were not caught by filter for codeswitches 
+  filter(!str_detect(annotation, pattern = "(dax|shang|banoona)"))                                                       #removes utterances that contain novel words (e.g. dax)
 
+ACLEW_all_anno_clean$annotation <- str_squish(ACLEW_all_anno_clean$annotation)                                           #remove excess white space in beginning, middle, and end of string
+ACLEW_all_anno_clean <- ACLEW_all_anno_clean[!ACLEW_all_anno_clean$annotation == "",]                                    #remove empty rows (these are extra spaces created when utterance were removed) 
 
-ACLEW_all_annotations_clean <- ACLEW_all_annotations_clean %>% 
-  mutate(sentence_id = row_number())  #row number 
+#this script is necessary for something 
 
-ACLEW_all_tokens <- ACLEW_all_annotations_clean %>% 
-  mutate(annotation = str_replace_all(annotation, pattern = "'", replacement = " '"))
+ACLEW_all_anno_clean <- ACLEW_all_anno_clean %>% 
+  mutate(sentence_id = row_number())                                                                                     #creates a sentence ID for each utterance using the row #  
 
+#some utterances have contractions. 
+#for utterances w contracts, we want morphemes to be an individual token. So the contraction he's would be counted as he + 's 
+#to do this, we have to replace all strings with a comma with a comma followed by space 
+#then we separate each token into it's separate row 
+ACLEW_all_tokens <- ACLEW_all_anno_clean %>% 
+  mutate(annotation = str_replace_all(annotation, pattern = "'", replacement = " '"))                                    
 ACLEW_all_tokens <- separate_rows(ACLEW_all_tokens, annotation, sep = " ")
 
 
 #ACLEW_all_annotations_clean <- ACLEW_all_annotations_clean %>% 
-mutate(sentence_id = row_number())  
+#mutate(sentence_id = row_number())  
 
 # ACLEW_func_content_tot<- separate_rows(ACLEW_func_content_tot, annotation, sep = " ")              #splits the utterances into words; each word is in a row   
 
