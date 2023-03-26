@@ -53,10 +53,10 @@ ACLEW_amount_xds_individual <- ACLEW_all_anno_updated %>%
 
 
 #analyses for linguistic measures: MLU, TTR, prop of utterance types (lines 57 - )
-#download the required library 
+#first, download the required library 
 library(stringr)
 
-#cleaning dataframe  
+#second,clean dataframe  
 #cleans ACLEW_all_anno_updated df by removing strings that follow a specified pattern 
 #filter fxn removes entire utterance 
 #str_remove_all only removes segments of string that matches the indicated pattern
@@ -75,87 +75,78 @@ ACLEW_all_anno_clean <- ACLEW_all_anno_updated %>%
 ACLEW_all_anno_clean$annotation <- str_squish(ACLEW_all_anno_clean$annotation)                                           #remove excess white space in beginning, middle, and end of string
 ACLEW_all_anno_clean <- ACLEW_all_anno_clean[!ACLEW_all_anno_clean$annotation == "",]                                    #remove empty rows (these are extra spaces created when utterance were removed) 
 
-#this script is necessary for something 
-
+#so, we want to add two columns to the ACLEW_clean file: sentence id and sentence length
+# the following two lines assign a unique ID for each sentence
 ACLEW_all_anno_clean <- ACLEW_all_anno_clean %>% 
   mutate(sentence_id = row_number())                                                                                     #creates a sentence ID for each utterance using the row #  
 
+#the next part is to determine the length of each utterance 
 #some utterances have contractions. 
 #for utterances w contracts, we want morphemes to be an individual token. So the contraction he's would be counted as he + 's 
 #to do this, we have to replace all strings with a comma with a comma followed by space 
-#then we separate each token into it's separate row 
-ACLEW_all_tokens <- ACLEW_all_anno_clean %>% 
+#then we move each token into a separate row 
+ACLEW_tok_per_utt <- ACLEW_all_anno_clean %>% 
   mutate(annotation = str_replace_all(annotation, pattern = "'", replacement = " '"))                                    
-ACLEW_all_tokens <- separate_rows(ACLEW_all_tokens, annotation, sep = " ")
+ACLEW_tok_per_utt <- separate_rows(ACLEW_tok_per_utt, annotation, sep = " ")
 
-
-#ACLEW_all_annotations_clean <- ACLEW_all_annotations_clean %>% 
-#mutate(sentence_id = row_number())  
-
-# ACLEW_func_content_tot<- separate_rows(ACLEW_func_content_tot, annotation, sep = " ")              #splits the utterances into words; each word is in a row   
-
-# ACLEW_func_content_tot <- ACLEW_func_content_tot[!ACLEW_func_content_tot$annotation == "",]        #remove empty rows (these are extra spaces created when utterance were removed)
-
-utt_length <- ACLEW_all_tokens %>% 
+#create a df that determines the length of each sentence 
+length_per_utt <- ACLEW_tok_per_utt %>% 
   group_by(sentence_id) %>% 
   summarize(token_id = row_number(),
             sentence_length = n())
 
-
-ACLEW_all_tokens <- bind_cols(ACLEW_all_tokens, utt_length, .name_repair = "unique")
-ACLEW_all_tokens <- select(ACLEW_all_tokens, -sentence_id...10)
-ACLEW_all_tokens <- rename(ACLEW_all_tokens, sentence_id = "sentence_id...11")
-
-#ACLEW_func_content_tot$doc_id <- "doc1"
-#ACLEW_func_content_tot <- rename(ACLEW_func_content_tot,sentence_id = sentence_id)
-
-# file_ACLEW <- left_join(ACLEW_func_content_tot, ACLEW_all_annotations_clean)
-# file_ACLEW <- rename(file_ACLEW,token = annotation)
-# file_ACLEW<- rename(file_ACLEW, token_id = word_location)
-# conllu <- as_conllu(file_ACLEW)
-# 
-# ggplot() +  #plot number of utterances per addressee 
-#   geom_point(data = ACLEW_amount_xds, aes(x = fct_infreq(addressee, average), y = average), stat = "identity", shape = 2, size = 3) + 
-#   geom_point(data = ACLEW_amount_xds_individual, aes(x = addressee, y = n, color = addressee), stat = "identity", position_jitter(width =0.1 )) + 
-#   theme_bw() +
-#   scale_y_continuous(breaks = seq(from = 0, to = 400, by = 25), limits = c(0,400)) + 
-#   xlab("Type of Speech") + 
-#   ylab("Average Number of Utterances") 
+#combines df so that the ACLEW_tok_per_utt also contains sentence length column 
+ACLEW_tok_per_utt <- bind_cols(ACLEW_tok_per_utt,length_per_utt, .name_repair = "unique")
+ACLEW_tok_per_utt <- select(ACLEW_tok_per_utt, -sentence_id...11)
+ACLEW_tok_per_utt <- rename(ACLEW_tok_per_utt, sentence_id = "sentence_id...12")
 
 
-#quantifies utterance types 
+#next, we will use the udpipe. 
+#udpipe prases text into tokens, lemma, and tags for parts of speech 
+#first, we need to download an English model for it to correctly annotate our text 
+#model is saved to folder 
 library(udpipe)
 dl <- udpipe_download_model(language = "english")
 str(dl)
 
+#then load model 
 udmodel_english <- udpipe_load_model(file = "english-ewt-ud-2.5-191206.udpipe")
 
-x_ACLEW_all_annotations <- udpipe_annotate(udmodel_english, x = ACLEW_all_annotations_clean$annotation)
-x_ACLEW_all_annotations <- as.data.frame(x_ACLEW_all_annotations)
-str(x_ACLEW_all_annotations)
+#annotate annotations text 
+#we are using the clean df bc udpipe requires sentence to annotate text correctly
+ACLEW_anno_tagged <- udpipe_annotate(udmodel_english, x = ACLEW_all_anno_clean$annotation)
+ACLEW_anno_tagged <- as.data.frame(x_ACLEW_all_anno)                                                 #creates df that separates each word in an utterance into a token, lemma, & identities the part of speech of the token 
 
-x_ACLEW_all_annotations$doc_id <- str_remove_all(x_ACLEW_all_annotations$doc_id, pattern = "doc")
-
-
-x_ACLEW_all_annotations_trimmed <- x_ACLEW_all_annotations %>% 
-  select(doc_id, sentence, token_id, token, lemma, upos, xpos, feats, sentence)  %>%
+#add function or content word column 
+ACLEW_anno_tagged <- ACLEW_anno_tagged %>% 
+  select(doc_id, sentence, token_id, token, lemma, upos, xpos, feats)  %>%
   mutate(func_or_con = case_when(upos == "ADJ" | upos == "NOUN"|upos == "VERB"|upos == "ADV" | upos == "INTJ"| upos == "PROPN" ~ "content",
-                                 upos == "ADP" | upos == "AUX" | upos == "CCONJ"| upos == "DET" | upos == "NUM"|upos == "PART"| upos == "PRON"| upos == "SCONJ" ~ "functor",
-                                 TRUE ~"other"))
-
-x_ACLEW_all_annotations_trimmed <- rename(x_ACLEW_all_annotations_trimmed,  annotation= sentence)
-x_ACLEW_all_annotations_trimmed<- rename(x_ACLEW_all_annotations_trimmed, sentence_id = doc_id) 
-
-x_ACLEW_all_annotations_trimmed$sentence_id <- as.integer(x_ACLEW_all_annotations_trimmed$sentence_id)
-x_ACLEW_all_annotations_trimmed$token_id <- as.integer(x_ACLEW_all_annotations_trimmed$token_id)
-
-x_ACLEW_all_annotations_trimmed <- x_ACLEW_all_annotations_trimmed %>% 
+                                 upos == "ADP" | upos == "AUX" | upos == "CCONJ"| upos == "DET" | upos == "NUM"|upos == "PART"| upos == "PRON"| upos == "SCONJ" ~ "function",
+                                 TRUE ~"other")) %>% 
   filter(!upos == "PUNCT", !upos == "SYM" , !upos == "X", !upos == "NUM", !upos == "PROPN")
 
-ACLEW_word_by_classes <- right_join(ACLEW_all_tokens, x_ACLEW_all_annotations_trimmed) 
+#ACLEW_anno_tagged does not contain participant_ID, xds, and participant. 
+#this is where ACLEW_tok_per_utt comes in 
+#first, make some changes to ACLEW_anno_tagged so that it contains columns that matches with ACLEW_tok_per_utt
+#columns that the dfs will be match on are sentence_id and annotation 
+#removes "doc" string from doc column  
+#instead of doc column having the text, doc, + a number, it now contains the number
+#the doc and sentences columns are renamed to sentence_id and annotation, respectively
+ACLEW_anno_tagged$doc_id <- str_remove_all(ACLEW_anno_tagged$doc_id, pattern = "doc")
+ACLEW_anno_tagged <- rename(ACLEW_anno_tagged,  annotation= sentence)
+ACLEW_anno_tagged <- rename(ACLEW_anno_tagged,sentence_id = doc_id)
+
+#change sentence_id & token_id columns into integaers 
+ACLEW_anno_tagged$sentence_id <- as.integer(ACLEW_anno_tagged$sentence_id)
+ACLEW_anno_tagged$token_id <- as.integer(ACLEW_anno_tagged$token_id)
+
+
+#df with all info (e.g., participant_id, xds, token, pos)
+ACLEW_all_info_tagged <- right_join(ACLEW_tok_per_utt, ACLEW_anno_tagged) 
+ACLEW_all_info_tagged <- ACLEW_all_info_tagged %>%                                   #remove 3749_scrubbed 
+  filter(!recording_id == "3749_scrubbed.eaf")
 
 ACLEW_func_content_tot_xds <- ACLEW_word_by_classes %>% 
-  filter(!recording_id == "3749_scrubbed.eaf", !str_detect(lemma, pattern = "(shang)|(dax)|(banoona)|(daxes)")) %>% 
   select(recording_id, xds, lemma, upos, func_or_con) %>% 
   group_by(recording_id, xds) %>%
   count(func_or_con)
