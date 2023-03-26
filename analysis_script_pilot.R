@@ -43,46 +43,14 @@ ACLEW_amount_xds_group <- ACLEW_all_anno_updated %>%
 ACLEW_amount_xds_group <- left_join(ACLEW_amount_xds_group, ACLEW_addresee_key)                  #adds key to summary table 
 
 
-#creates bar plot of group data 
-ggplot() +
-geom_bar(data = ACLEW_amount_xds_group, aes(x = fct_reorder(addressee, average), y = average, color = addressee,  alpha = .2), fill = "white", stat = "identity") + 
-geom_errorbar(data = ACLEW_amount_xds_group, aes(x = addressee, ymin = lower, ymax = upper, color = addressee ), width = .4) +
-geom_point(data  = ACLEW_amount_xds_individual, aes(x = addressee, y = n, color = addressee), stat = "identity", position = position_jitter(width = 0.1)) + 
-geom_text(data = ACLEW_amount_xds_group, aes(x = addressee, y = 350, label = str_c("N=",N, sep = " ")))+ 
-  theme_bw() + 
-  scale_y_continuous(breaks = seq(from = 0, to = 350, by = 25), limits = c(-1,351)) + 
-  xlab("Addressee") + 
-  ylab("Mean Utterrances")  + 
-  labs(caption = "Fig. 1 Utterances directed to each Addressee. Each point represents a subject. Sample size indicates total \n number of infants who contributed data." ) + 
-  theme(legend.position = "none", text = element_text(size = 15), plot.caption = element_text(size = 11, hjust = 0)) 
-  
-  savePlot(filename = "mean_utt_per_address_pilot", type = "png")
-
 
 #tallies the no. of utterances directed to each addressee per infant
-ACLEW_amount_xds_individual <- ACLEW_all_anno_updated %>%                        
+ACLEW_amount_xds_individual <- ACLEW_all_anno_updated %>%
   filter(!participant == "CHI" & !recording_id == "3749_scrubbed.eaf" & !xds %in% c('X','M')) %>%    #exclude speech from target child and 3749_scrubbed
   group_by(recording_id) %>%
-  count(xds) %>% 
-  
+  count(xds) %>%
 
-ACLEW_amount_xds_individual <- left_join(ACLEW_amount_xds_individual, ACLEW_addresee_key)     #adds key to summary table
-
-
-
-#ACLEW_amount_xds_individual$addressee <- factor(ACLEW_amount_xds_individual$addressee, levels = c("unsure", "child+adult", "pet", "other", "child", "target_child","adult")) #relevels factors
-
-library(ggplot2)
-
-ggplot(data = ACLEW_amount_xds_individual, aes(x = fct_reorder(addressee,n), y = n,color = addressee)) +  #boxplot of avg # of utterances per addressee 
-  geom_boxplot(width = .2) + 
-  geom_point(stat = "identity", position = position_jitter(width = 0.1)) +                                                          #plots individual subjects as data point
-  theme_bw() + 
-  scale_y_continuous(breaks = seq(from = 0, to = 350, by = 25), limits = c(0,350)) + 
-  xlab("Addressee") + 
-  ylab("Number of Utterrances")  + 
-  theme(legend.position = "none", text = element_text(size = 15)) 
-
+ ACLEW_amount_xds_individual <- left_join(ACLEW_amount_xds_individual, ACLEW_addresee_key)     #adds key to summary table
 
 
 
