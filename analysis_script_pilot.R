@@ -53,34 +53,6 @@ ACLEW_amount_xds_individual <- ACLEW_all_anno_updated %>%
  ACLEW_amount_xds_individual <- left_join(ACLEW_amount_xds_individual, ACLEW_addresee_key)     #adds key to summary table
 
 
-
-ACLEW_speaker <- ACLEW_all %>%  #counts number of utterances spoken by each speaker 
-  filter(!participant == "CHI") %>% 
-  group_by(ID) %>% 
-  count(participant)
-
-ACLEW_speaker$speaker <- NA
-
-ACLEW_speaker[grep("A", ACLEW_speaker$participant),4] <- "adult_speaker"
-ACLEW_speaker[grep("E", ACLEW_speaker$participant),4] <- "electronic"
-ACLEW_speaker[grep("UC", ACLEW_speaker$participant),4] <- "other_child_unknown_gender"
-
-#ACLEW_speaker$coding <- NA
-#ACLEW_speaker$coding <- grep("A", ACLEW_speaker$participant) "adult_speaker")
-#  ifelse(ACLEW_speaker$participant == "CHI", "target_child", 
-#  ifelse(grep("UC", ACLEW_speaker$participant), "unknown_child", grep("E", ACLEW_speaker$participant), "electronic")))
-
-ACLEW_speaker$speaker<- factor(ACLEW_speaker$speaker, levels = c("other_child_unknown_gender", "electronic", "adult_speaker"))
-
-ggplot(ACLEW_speaker, aes(x = ID, y = n, fill = speaker))+ #plot number of utterances per speaker 
-  geom_bar(position = "stack", stat = "identity") + 
-  theme_bw() + 
-  scale_y_continuous(breaks = seq(from = 0, to = 800, by = 100), limits = c(0,800))  +
-  xlab("Participant ID") + 
-  ylab("Number of Utterances") + 
-  scale_fill_brewer(palette = "YlGnBu", direction = -1)
-
-
 #calculate frequency of each type of content word 
 library(stringr)
 
