@@ -154,7 +154,7 @@ ACLEW_N_utt <- ACLEW_all_info_tagged %>%
   filter(xds %in% c('A', 'K', 'T')) %>% 
   group_by(xds, recording_id) %>% 
   count(sentence)  %>%
-  group_by(recording_id) %>% 
+  group_by(xds) %>% 
   summarise(total = sum(n))
 
 sample <- min(ACLEW_N_utt$total)
@@ -171,6 +171,17 @@ ACLEW_MLU_per_xds_group <- ACLEW_all_info_tagged%>%
   group_by(recording_id, xds, sentence_id) %>% 
   summarise(sentence_length = mean(sentence_length)) %>% 
   group_by(recording_id, xds) %>% 
+  summarise(avg_mlu_id = mean(sentence_length)) %>% 
+  group_by(xds) %>% 
+  summarise(average = mean(avg_mlu_id), 
+            N = n_distinct(recording_id),
+            SD = sd(avg_mlu_id),
+            SE = SD/sqrt(N),
+            lower=average-SE,
+            upper=average+SE)
+
+ 
+  
   summarise(avg_mlu_id = mean(sentence_length)) %>% 
   group_by(xds) %>% 
   summarise(average = mean(avg_mlu_id), 
