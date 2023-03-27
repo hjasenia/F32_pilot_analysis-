@@ -1,0 +1,49 @@
+---
+title: "F32_pilot_data_visualization"
+author: "Jasenia Hartman"
+date: "2023-03-27"
+output: html_document
+---
+plots group and individual data of mean utterances per addressee as bar graph 
+```{r}
+ggplot() +
+  geom_bar(data = ACLEW_amount_xds_group, aes(x = fct_reorder(addressee, average), y = average, color = addressee,  alpha = .2), fill = "white", stat = "identity") + 
+  geom_errorbar(data = ACLEW_amount_xds_group, aes(x = addressee, ymin = lower, ymax = upper, color = addressee ), width = .4) +
+  geom_point(data  = ACLEW_amount_xds_individual, aes(x = addressee, y = n, color = addressee), stat = "identity", position = position_jitter(width = 0.1)) + 
+  geom_text(data = ACLEW_amount_xds_group, aes(x = addressee, y = 350, label = str_c("N=",N, sep = " ")))+ 
+  theme_bw() + 
+  scale_y_continuous(breaks = seq(from = 0, to = 350, by = 25), limits = c(-1,351)) + 
+  xlab("Addressee") + 
+  ylab("Mean Utterrances")  + 
+  labs(caption = "Fig. 1 Utterances directed to each Addressee. Each point represents a subject. Sample size indicates total \n number of infants who contributed data." ) + 
+  theme(legend.position = "none", text = element_text(size = 15), plot.caption = element_text(size = 11, hjust = 0)) 
+```
+plots mean length of utterance per addressee at group & individual level 
+```{r}
+ggplot() +
+  geom_bar(data = ACLEW_MLU_per_xds_group , aes(x = fct_reorder(addressee, average), y = average, color = addressee,  alpha = .2), fill = "white", stat = "identity") +
+  geom_errorbar(data = ACLEW_MLU_per_xds_group, aes(x = addressee, ymin = lower, ymax = upper, color = addressee ), width = .4) +
+  geom_point(data  = ACLEW_MLU_per_xds_individual, aes(x = addressee, y = average, color = addressee), stat = "identity", position = position_jitter(width = 0.1)) +
+  geom_text(data = ACLEW_MLU_per_xds_group , aes(x = addressee, y = 8.2, label = str_c("N=",N, sep = " ")))+ 
+  theme_bw() + 
+  scale_y_continuous(breaks = seq(from = 0, to = 14, by = 2), limits = c(0,14)) + 
+  xlab("Addressee") + 
+  ylab("Mean Length of Utterance")  + 
+  labs(caption = "Fig. 2 Mean Length of Utterances Directed to each Addressee. Each point represents a subject. Sample size indicates total number of infants who contributed data. 882 utterances analyzed per addressee \n (size based on group with lowest sample)" ) + 
+  theme(legend.position = "none", text = element_text(size = 15), plot.caption = element_text(size = 11, hjust = 0)) 
+```
+
+plots type-token ratio per addressee at gropu & individual level
+```{r}
+ggplot() +
+  geom_bar(data = ACLEW_TTR_group , aes(x = fct_reorder(addressee, TTR), y = TTR, color = addressee,  alpha = .2), fill = "white", stat = "identity") +
+  geom_errorbar(data = ACLEW_TTR_group, aes(x = addressee, ymin = lower, ymax = upper, color = addressee ), width = .4) +
+  geom_point(data  = ACLEW_TTR_individual, aes(x = addressee, y = TTR_id, color = addressee), stat = "identity", position = position_jitter(width = 0.1)) +
+  geom_text(data = ACLEW_TTR_group , aes(x = addressee, y = .61, label = str_c("N=",N, sep = " ")))+ 
+  theme_bw() + 
+  scale_y_continuous(breaks = seq(from = 0, to = .8, by = .2), limits = c(0,.8)) + 
+  xlab("Addressee") + 
+  ylab("Type-Token Ratio")  + 
+  labs(caption = "Fig. 3 Lexical Diversity heard by Addressee. Each point represents a subject. Sample size indicates total number of infants who contributed data. 187 utterances analyzed per addressee \n (size based on group with lowest sample)" ) + 
+  theme(legend.position = "none", text = element_text(size = 15), plot.caption = element_text(size = 11, hjust = 0)) 
+```
