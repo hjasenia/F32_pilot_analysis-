@@ -115,7 +115,7 @@ udmodel_english <- udpipe_load_model(file = "english-ewt-ud-2.5-191206.udpipe")
 #annotate annotations text 
 #we are using the clean df bc udpipe requires sentence to annotate text correctly
 ACLEW_anno_tagged <- udpipe_annotate(udmodel_english, x = ACLEW_all_anno_clean$annotation)
-ACLEW_anno_tagged <- as.data.frame(x_ACLEW_all_anno)                                                 #creates df that separates each word in an utterance into a token, lemma, & identities the part of speech of the token 
+ACLEW_anno_tagged <- as.data.frame(ACLEW_anno_tagged)                                                 #creates df that separates each word in an utterance into a token, lemma, & identities the part of speech of the token 
 
 #add function or content word column 
 ACLEW_anno_tagged <- ACLEW_anno_tagged %>% 
@@ -133,7 +133,7 @@ ACLEW_anno_tagged <- ACLEW_anno_tagged %>%
 #instead of doc column having the text, doc, + a number, it now contains the number
 #the doc and sentences columns are renamed to sentence_id and annotation, respectively
 ACLEW_anno_tagged$doc_id <- str_remove_all(ACLEW_anno_tagged$doc_id, pattern = "doc")
-ACLEW_anno_tagged <- rename(ACLEW_anno_tagged,  annotation= sentence)
+#ACLEW_anno_tagged <- rename(ACLEW_anno_tagged,  annotation= sentence)
 ACLEW_anno_tagged <- rename(ACLEW_anno_tagged,sentence_id = doc_id)
 
 #change sentence_id & token_id columns into integaers 
@@ -145,6 +145,137 @@ ACLEW_anno_tagged$token_id <- as.integer(ACLEW_anno_tagged$token_id)
 ACLEW_all_info_tagged <- right_join(ACLEW_tok_per_utt, ACLEW_anno_tagged) 
 ACLEW_all_info_tagged <- ACLEW_all_info_tagged %>%                                   #remove 3749_scrubbed 
   filter(!recording_id == "3749_scrubbed.eaf")
+
+
+#for MLU per addressee 
+#calculate total sentences addressed to each addressee
+ACLEW_N_utt <- ACLEW_all_info_tagged %>% 
+  filter(!str_detect(sentence, pattern = "'")) %>% 
+  filter(xds %in% c('A', 'K', 'T')) %>% 
+  group_by(xds, recording_id) %>% 
+  count(sentence)  %>%
+  group_by(recording_id) %>% 
+  summarise(total = sum(n))
+
+sample <- min(ACLEW_N_utt$total)
+sample <- as.numeric(sample)
+
+
+#calculate MLU-w at group level
+ACLEW_MLU_per_xds_group <- ACLEW_all_info_tagged%>% 
+  filter(!str_detect(sentence, pattern = "'")) %>% 
+  filter(xds %in% c('A', 'K', 'T')) %>% 
+  group_by(xds) %>% 
+  slice_sample(n = sample)   %>%
+  select(recording_id, sentence_length,sentence_id, xds) %>% 
+  group_by(recording_id, xds, sentence_id) %>% 
+  summarise(sentence_length = mean(sentence_length)) %>% 
+  group_by(recording_id, xds) %>% 
+  summarise(avg_mlu_id = mean(sentence_length)) %>% 
+  group_by(xds) %>% 
+  summarise(average = mean(avg_mlu_id), 
+            N = n_distinct(recording_id),
+            SD = sd(avg_mlu_id),
+            SE = SD/sqrt(N),
+            lower=average-SE,
+            upper=average+SE)
+
+ACLEW_MLU_per_xds_group <- left_join(ACLEW_MLU_per_xds_group, ACLEW_addresee_key)
+
+#calculate MLU_w at individual level 
+ACLEW_MLU_per_xds_individual <- ACLEW_all_info_tagged%>% 
+  filter(!str_detect(sentence, pattern = "'")) %>% 
+  filter(xds %in% c('A', 'K', 'T')) %>% 
+  group_by(xds) %>% 
+  slice_sample(n = sample)   %>%
+  select(recording_id, sentence_length,sentence_id, xds) %>% 
+  group_by(recording_id, xds, sentence_id) %>% 
+  summarise(sentence_length = mean(sentence_length)) %>% 
+  group_by(recording_id, xds) %>% 
+  summarise(average = mean(sentence_length))
+
+ACLEW_MLU_per_xds_individual <- left_join(ACLEW_MLU_per_xds_individual, ACLEW_addresee_key)
+
+#calculate TTR at group level 
+
+ACLEW_corrected <- ACLEW_all_info_tagged %>%
+  filter(!lemma %in% qdapDictionaries::interjections) %>%
+  filter(lemma %in% qdapDictionaries::GradyAugmented) 
+
+#find min sample for type-token ratio
+ACLEW_N_TTR <- ACLEW_corrected %>% 
+  filter(!str_detect(sentence, pattern = "'")) %>% 
+  filter(xds %in% c('A', 'K', 'T')) %>% 
+  group_by(xds, recording_id, sentence) %>% 
+  count(lemma)  %>%
+  group_by(xds, recording_id) %>% 
+  summarise(total = sum(n)) %>%
+  group_by(recording_id) %>% 
+  summarise(total = sum(total))
+
+
+#calculate sample size 
+sample <- min(ACLEW_N_TTR$total)
+sample <- as.numeric(sample)
+
+#calculate TTR on group level 
+ACLEW_TTR_group <- ACLEW_corrected%>% 
+  filter(!str_detect(sentence, pattern = "'")) %>% 
+  filter(xds %in% c('A', 'K', 'T')) %>% 
+  group_by(recording_id) %>% 
+  slice_sample(n = sample) %>%  
+  select(recording_id,xds, token, lemma) %>% 
+  group_by(recording_id, xds) %>% 
+  summarise(total_tokens = sample,                                                  #note to self: change column name of total_tokens to reflect sample size 
+            total_distinct_word = sum(n_distinct(lemma)),
+            TTR_id = total_distinct_word/total_tokens)  %>% 
+  group_by(xds) %>% 
+    summarise(TTR = mean(TTR_id),
+              N = n_distinct(recording_id),
+              SD = sd(TTR_id),
+              SE = SD/sqrt(N),
+              lower=TTR-SE,
+             upper=TTR+SE)
+
+ACLEW_TTR_group <- left_join(ACLEW_TTR_group, ACLEW_addresee_key)
+
+#calculate TTR on individual level 
+ACLEW_TTR_individual <- ACLEW_corrected%>% 
+  filter(!str_detect(sentence, pattern = "'")) %>% 
+  filter(xds %in% c('A', 'K', 'T')) %>% 
+  group_by(recording_id) %>% 
+  slice_sample(n = sample) %>%  
+  select(recording_id,xds, token, lemma) %>% 
+  group_by(recording_id, xds) %>% 
+  summarise(total_tokens = sample,
+            total_distinct_word = sum(n_distinct(lemma)),
+            TTR_id = total_distinct_word/total_tokens) 
+ACLEW_TTR_individual <- left_join(ACLEW_TTR_individual, ACLEW_addresee_key)
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ACLEW_func_content_tot_xds <- ACLEW_word_by_classes %>% 
   select(recording_id, xds, lemma, upos, func_or_con) %>% 
@@ -366,99 +497,6 @@ ggplot(data = top_20_noun_prev_word_class, aes(x = fct_reorder(lemma,total,.desc
 # 
 
 
-ACLEW_min_sample_mlu <- ACLEW_word_by_classes %>% 
-  filter(!recording_id == "3749_scrubbed.eaf", !str_detect(lemma, pattern = "(shang)|(dax)|(banoona)|(daxes)")) %>% 
-  filter(!str_detect(sentence, pattern = "'")) %>% 
-  filter(xds %in% c('A', 'C', 'T')) %>% 
-  group_by(xds, recording_id) %>% 
-  count(sentence)  %>%
-  group_by(xds) %>% 
-  summarise(total = sum(n))
-
-sample <- min(ACLEW_min_sample_mlu$total)
-sample <- as.numeric(sample)
-
-
-#count mlu-w 
-ACLEW_sample_for_mlu <- ACLEW_word_by_classes %>% 
-  filter(!recording_id == "3749_scrubbed.eaf", !str_detect(lemma, pattern = "(shang)|(dax)|(banoona)|(daxes)")) %>% 
-  filter(!str_detect(sentence, pattern = "'")) %>% 
-  filter(xds %in% c('A', 'C', 'T')) %>% 
-  group_by(xds) %>% 
-  slice_sample(n = sample)   %>%
-  select(recording_id, sentence_length,sentence_id, xds, lemma) %>% 
-  group_by(recording_id, xds, sentence_id) %>% 
-  summarise(sentence_length = mean(sentence_length)) %>% 
-  group_by(recording_id, xds) %>% 
-  summarise(mlu = mean(sentence_length)) 
-
-
-
-ggplot(data = ACLEW_sample_for_mlu, aes(x = xds, y = mlu,color = xds)) +  #boxplot of avg # of utterances per addressee 
-  geom_boxplot() + 
-  geom_point(stat = "identity") + 
-  #geom_point(stat = "identity") +                                                          #plots individual subjects as data point
-  theme_bw() + 
-  scale_y_continuous(breaks = seq(from = 0, to = 14, by = 2), limits = c(0,14)) + 
-  xlab("Type of Addressee") + 
-  scale_x_discrete(label = c("adult", "child", "target child")) + 
-  ylab("Mean Length of Utterance") + 
-  labs(caption = "sample size of 975 was selected based on group with lowest sample") + 
-  theme(plot.caption = element_text(hjust = 0.5), legend.position = "none")
-#sample size of 975 was selected based off lowest group 
-
-ACLEW_corrected_dictionary <- ACLEW_word_by_classes %>%
-  filter(!lemma %in% qdapDictionaries::interjections) %>%
-  filter(lemma %in% qdapDictionaries::GradyAugmented) 
-
-#find min sample for type-token ratio
-ACLEW_min_sample_TTR <- ACLEW_corrected_dictionary %>% 
-  filter(!recording_id == "3749_scrubbed.eaf", !str_detect(lemma, pattern = "(shang)|(dax)|(banoona)|(daxes)")) %>% 
-  filter(!str_detect(sentence, pattern = "'")) %>% 
-  filter(xds %in% c('A', 'C', 'T')) %>% 
-  group_by(xds, recording_id, sentence) %>% 
-  count(lemma)  %>%
-  group_by(xds, recording_id) %>% 
-  summarise(total = sum(n))
-
-
-#calculate sample size 
-sample <- min(ACLEW_min_sample_TTR$total)
-sample <- as.numeric(sample)
-
-#calculate TTR 
-ACLEW_sample_for_TTR <- ACLEW_corrected_dictionary %>% 
-  filter(!recording_id == "3749_scrubbed.eaf", !str_detect(lemma, pattern = "(shang)|(dax)|(banoona)|(daxes)")) %>% 
-  filter(!str_detect(sentence, pattern = "'")) %>% 
-  filter(xds %in% c('A', 'C', 'T')) %>% 
-  group_by(xds) %>% 
-  slice_sample(n = sample)   %>%
-  select(recording_id,xds, token, lemma) %>% 
-  group_by(recording_id, xds) %>% 
-  count(lemma) %>% 
-  group_by(xds) %>% 
-  summarise(total_lemma = sum(n),
-            distinct_lemma = n_distinct(lemma),
-            TTR = mean(distinct_lemma/total_lemma), 
-            sample = n_distinct(recording_id), 
-            sd = sd(TTR))
-
-
-# TTR = distinct_lemma/total_lemma)  
-# group_by(xds) 
-# summarise(avg_TTR = mean(TTR),
-#           sd = sd(TTR))
-
-ggplot(data = ACLEW_sample_for_TTR, aes(x = xds, y = TTR, fill = xds)) +  #boxplot of avg # of utterances per addressee 
-  geom_bar(stat = "identity") + 
-  #geom_point(stat = "identity") +                                                          #plots individual subjects as data point
-  theme_bw() + 
-  scale_y_continuous(breaks = seq(from = 0, to = 1, by = .2), limits = c(0,1)) + 
-  xlab("Type of Addressee") + 
-  scale_x_discrete(label = c("adult", "child", "target child")) + 
-  ylab("Type-Token Ratio ") + 
-  labs(caption = "sample size of 893 was selected based on group with lowest sample") + 
-  theme(plot.caption = element_text(hjust = 0.5), legend.position = "none")
 
 
 #analyze and plot all functors 
