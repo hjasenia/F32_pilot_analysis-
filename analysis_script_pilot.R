@@ -1,3 +1,19 @@
+#pwr analysis 
+#effect size based on Foushee 2020 d = 0.61; 
+#paired t-test bc within subjects design for Exps 1 & 2 of Aim 2 
+ 
+library(pwr)
+sample <- pwr.t.test(d =0.61, sig.level = .05, power = .90, type = "paired", alternative = "two.sided" )
+
+#calculate final sample size 
+N = ceiling(sample$n)
+num_groups = 2 
+num_exp = 2 
+add_participant = 10   #accounts for attrition rate 
+
+final_N_per_exp = (N * num_groups) + add_participant
+final_N_Aim2 = ((N * num_groups) + add_participant) *  num_exp  
+
 setwd("/Users/jhartman3/Documents/postdoc/ACLEW_prelim-data/random")
 library(tidyr)
 library(tidyverse)
@@ -165,13 +181,13 @@ sample <- as.numeric(sample)
 ACLEW_MLU_per_xds_group <- ACLEW_all_info_tagged%>% 
   filter(!str_detect(sentence, pattern = "'")) %>% 
   filter(xds %in% c('A', 'K', 'T')) %>% 
-  group_by(xds) %>% 
+  group_by(recording_id) %>% 
   slice_sample(n = sample)   %>%
   select(recording_id, sentence_length,sentence_id, xds) %>% 
   group_by(recording_id, xds, sentence_id) %>% 
   summarise(sentence_length = mean(sentence_length)) %>% 
   group_by(recording_id, xds) %>% 
-  summarise(avg_mlu_id = mean(sentence_length)) %>% 
+  summarise(avg_mlu_id = mean(sentence_length), tot_utt = sample) %>% 
   group_by(xds) %>% 
   summarise(average = mean(avg_mlu_id), 
             N = n_distinct(recording_id),
@@ -181,15 +197,15 @@ ACLEW_MLU_per_xds_group <- ACLEW_all_info_tagged%>%
             upper=average+SE)
 
  
-  
-  summarise(avg_mlu_id = mean(sentence_length)) %>% 
-  group_by(xds) %>% 
-  summarise(average = mean(avg_mlu_id), 
-            N = n_distinct(recording_id),
-            SD = sd(avg_mlu_id),
-            SE = SD/sqrt(N),
-            lower=average-SE,
-            upper=average+SE)
+  # 
+  # summarise(avg_mlu_id = mean(sentence_length)) %>% 
+  # group_by(xds) %>% 
+  # summarise(average = mean(avg_mlu_id), 
+  #           N = n_distinct(recording_id),
+  #           SD = sd(avg_mlu_id),
+  #           SE = SD/sqrt(N),
+  #           lower=average-SE,
+            # upper=average+SE)
 
 ACLEW_MLU_per_xds_group <- left_join(ACLEW_MLU_per_xds_group, ACLEW_addresee_key)
 
@@ -246,12 +262,12 @@ ACLEW_TTR_group <- ACLEW_corrected%>%
               SD = sd(TTR_id),
               SE = SD/sqrt(N),
               lower=TTR-SE,
-             upper=TTR+SE)
-
-ACLEW_TTR_group <- left_join(ACLEW_TTR_group, ACLEW_addresee_key)
+             upper=TTR+SE) %>% 
+ 
+  ACLEW_TTR_group <- left_join(ACLEW_TTR_group, ACLEW_addresee_key)
 
 #calculate TTR on individual level 
-ACLEW_TTR_individual <- ACLEW_corrected%>% 
+ACLEW_TTR_individual <- ACLEW_all_info_tagged%>% 
   filter(!str_detect(sentence, pattern = "'")) %>% 
   filter(xds %in% c('A', 'K', 'T')) %>% 
   group_by(recording_id) %>% 
@@ -265,35 +281,52 @@ ACLEW_TTR_individual <- left_join(ACLEW_TTR_individual, ACLEW_addresee_key)
 
  
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-ACLEW_func_content_tot_xds <- ACLEW_word_by_classes %>% 
+#calculate total no of function and content words across all addressee
+ACLEW_func_content_tot_xds <- ACLEW_all_info_tagged %>% 
   select(recording_id, xds, lemma, upos, func_or_con) %>% 
   group_by(recording_id, xds) %>%
-  count(func_or_con)
-group_by(xds, func_or_con) %>% 
+  count(func_or_con) %>% 
+  group_by(xds, func_or_con) %>% 
   summarise(average = mean(n))
+
+
+#calculate frequency of each function word, focusing specifically on aux, pronouns, and determiners 
+ACLEW_func_freq <- ACLEW_corrected %>% 
+  filter(func_or_con == "function") %>%    #filter for function words only 
+  filter(xds %in% c("A","K","T")) %>%
+  filter(upos %in% c("AUX", "PRON", "DET")) %>% 
+  select(recording_id, xds, lemma, token, upos) %>% 
+  group_by(recording_id, xds, lemma) %>%     
+  count(lemma) %>% 
+  filter(!lemma %in% c('babe', 'everything', 'every', 'anyone', 'everybody', 'which', 'anything', 'bath', 'another','bunny', 'daddy', 'forget', 'fourteen', 'hairy', 'may', 'might', 
+                       'must', 'mine', 'myself', 'no', 'nose', 'nothing', 'quite', 'somebody', 
+                       'someone', 'something', 'tan', 'such', 'yourself', 'ya', 'who', 'whatever', 
+                       'what', 'tho', 'this', 'these', 'there', 'that', 'nobody', 'aright', 'everyone', 'some',
+                       'each', 'ancestry', 'alright', 'bye', 'each', 'shave','could', 'should', 'any', 'all', 'those', 'would', 'herself', 'anybody', 'say')) %>%
+  group_by(recording_id, lemma) %>% 
+  summarise(frequency = sum(n))
+
+#calculates frequency of each function word per xds 
+ACLEW_func_xds <- ACLEW_corrected %>% 
+  filter(func_or_con == "function") %>% 
+  filter(xds %in% c("A","K","T")) %>%      #filter for function words only 
+  filter(upos %in% c("AUX", "PRON", "DET")) %>% 
+  select(recording_id, xds, lemma, token, upos) %>% 
+  group_by(recording_id, xds, lemma) %>%     
+  count(lemma) %>% 
+  filter(!lemma %in% c('babe', 'everything', 'every', 'anyone', 'everybody', 'which', 'anything', 'bath', 'another','bunny', 'daddy', 'forget', 'fourteen', 'hairy', 'may', 'might', 
+                       'must', 'mine', 'myself', 'no', 'nose', 'nothing', 'quite', 'somebody', 
+                       'someone', 'something', 'tan', 'such', 'yourself', 'ya', 'who', 'whatever', 
+                       'what', 'tho', 'this', 'these', 'there', 'that', 'nobody', 'aright', 'everyone', 'some',
+                       'each', 'ancestry', 'alright', 'bye', 'each', 'shave','could', 'should', 'any', 'all', 'those', 'would', 'herself', 'anybody', 'say')) %>%
+group_by(xds, lemma)
+
+#combines func_freq & func_xds so that we have raw frequency of each function word & frequency of occurrence of each function word broken down by xds 
+ACLEW_func_freq <- left_join(ACLEW_func_xds, ACLEW_func_freq) %>% 
+  mutate(rel_freq = n/frequency)
+
+ACLEW_func_freq$xds <- factor(ACLEW_func_freq$xds,  c('T', 'K', 'A')) 
+
 
 ACLEW_func_content_upos_xds <- ACLEW_word_by_classes %>% 
   filter(!recording_id == "3749_scrubbed.eaf", !str_detect(lemma, pattern = "(shang)|(dax)|(banoona)|(daxes)")) %>% 
