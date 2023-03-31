@@ -9,10 +9,10 @@ sample <- pwr.t.test(d =0.61, sig.level = .05, power = .90, type = "paired", alt
 N = ceiling(sample$n)
 num_groups = 2 
 num_exp = 2 
-add_participant = 10   #accounts for attrition rate 
+add_participant_per_group = 10   #accounts for attrition rate 
 
-final_N_per_exp = (N * num_groups) + add_participant
-final_N_Aim2 = ((N * num_groups) + add_participant) *  num_exp  
+N_across_exp = (N * num_groups) * num_exp
+N_Aim2 = N_across_exp + (add_participant_per_group * num_groups * num_exp) 
 
 setwd("/Users/jhartman3/Documents/postdoc/ACLEW_prelim-data/random")
 library(tidyr)
@@ -288,6 +288,17 @@ ACLEW_func_content_tot_xds <- ACLEW_all_info_tagged %>%
   count(func_or_con) %>% 
   group_by(xds, func_or_con) %>% 
   summarise(average = mean(n))
+
+## calculate top content words across addressee, focusing specifically on nouns and verbs 
+ACLEW_top_content_ads <- ACLEW_corrected %>% 
+  filter(func_or_con == "content") %>% 
+  filter(upos %in% c("NOUN", "VERB")) %>% 
+  filter(xds %in% c("A")) %>% 
+  group_by(xds, lemma, upos) %>% 
+  count(lemma) 
+
+
+##calculate 
 
 
 #calculate frequency of each function word, focusing specifically on aux, pronouns, and determiners 
